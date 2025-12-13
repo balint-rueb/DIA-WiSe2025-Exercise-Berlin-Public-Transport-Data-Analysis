@@ -1,0 +1,42 @@
+name: DIA_2025_26 #included to prevent name collision on volumes and networks across multiple projects
+services:
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/app #mounts project root dir to /app directory inside devcontainer
+    env_file:
+      - ../env/devcontainer.env
+      - ../env/postgres.env
+      - ../env/pgadmin.env
+
+  db:
+    image: postgres:latest
+    env_file:
+      - ../env/postgres.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432" # Optional, remove if not needed on localhost
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    env_file:
+      - ../env/pgadmin.env
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin # Persists pgAdmin config
+    ports:
+      - "5050:80" # pgAdmin accessible on localhost:5050
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  pgadmin-data: 

@@ -32,7 +32,7 @@ CREATE TABLE dim_time (
     year INT,                          -- 2025
     month INT,                         -- 9
     day INT,                           -- 2
-    day_of_week VARCHAR(20),           -- 'Tuesday'. Could also be INT (1=Monday, 7=Sunday) but string is more readable. Added into table for potentially interesting queries.
+    day_of_week VARCHAR(20)            -- 'Tuesday'. Could also be INT (1=Monday, 7=Sunday) but string is more readable. Added into table for potentially interesting queries.
 );
 
 -- ==========================================

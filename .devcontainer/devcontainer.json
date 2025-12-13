@@ -1,0 +1,26 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/anaconda
+{
+	"name": "DIA with Postgres DB",
+	"dockerComposeFile" : ["docker-compose.yml", "docker-compose.debug.yml"],
+	"service" : "devcontainer", // Name of the service in docker-compose.yml to use as the dev container
+	"workspaceFolder": "/app", //synced with WORKDIR of Dockerfile
+	"shutdownAction": "stopCompose", // Stop the docker-compose service when the dev container is closed
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-azuretools.vscode-docker",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg"
+      ]
+		}
+	},
+	"forwardPorts": [5432], // Forward Postgres port
+	//can be removed since docker-compose takes care of mounting local file system into container with columes: ..:/app
+	"remoteUser": "vscode"
+}

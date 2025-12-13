@@ -1,0 +1,6 @@
+# services:
+#   back-end:
+#     command: >
+#        sh -c "pip install debugpy -q &&
+#        export PYTHONPATH=/app/src &&
+#        python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn src.main:app --host 0.0.0.0 --port 8000"

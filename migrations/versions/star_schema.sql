@@ -60,7 +60,9 @@ CREATE TABLE fact_train_stops (
     is_cancelled BOOLEAN DEFAULT FALSE
 );
 
+
 -- ==========================================
--- Indexes for Performance
+-- NOTES
 -- ==========================================
---TODO
+-- This star schema was designed first before the rest of the tasks were done. Some changes were made to the database schema through alembic migrations
+-- that arent refleced here, but the core star schema design remains the same.

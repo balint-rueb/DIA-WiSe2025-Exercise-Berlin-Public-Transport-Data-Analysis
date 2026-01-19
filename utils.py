@@ -2,7 +2,7 @@
 from rapidfuzz import utils, process
 
 #data model imports
-from models import Station, TrainProfile
+from models import Station, TrainProfile, TrainStop
 
 #imports for date parsing
 from datetime import datetime,timedelta, date
@@ -114,6 +114,12 @@ def get_or_create_profile_safe(session, t_type, t_num):
 
     # 3. Fetch ID (It must exist now, either from step 1 or 2)
     return session.execute(stmt).scalar()
+
+def perform_bulk_insert(session, batch):
+    stmt = insert(TrainStop).values(batch)
+    upsert_stmt = stmt.on_conflict_do_nothing(index_elements=['stop_id'])
+    session.execute(upsert_stmt)
+    session.commit()
 
 ## --- LEGACY CODE FOR STREAMING XML FILES FROM TAR.GZ ARCHIVES ---
 def stream_xml_files(tar_path):

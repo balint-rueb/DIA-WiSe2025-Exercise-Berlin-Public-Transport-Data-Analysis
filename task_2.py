@@ -60,8 +60,11 @@ def task_2_3_count_cancellations(session, check_date, check_hour):
     """Task 2.3: Return total number of canceled trains for a specific date and hour."""
     print(f"\n--- Task 2.3: Cancellations on {check_date} during hour {check_hour} ---")
     
-    # count all rows that pass the filers defined later
-    # 
+    # count all rows that pass the filers defined later.
+    # The filter works as follows:
+    # 1. date_id = check_date (matches the date)
+    # 2. EXTRACT(HOUR FROM planned_arrival) = check_hour (matches the hour from planned arrival time)
+    # 3. is_cancelled = TRUE (only count cancellations)
     sql = text("""
         SELECT COUNT(*) as total_cancelled
         FROM fact_train_stops
@@ -79,6 +82,7 @@ def task_2_4_average_delay(session, station_name):
     
     # We sum the two columns row-by-row, then take the average of those sums.
     # Since we set default=0 in the ETL, we don't need to worry about NULLs here.
+    # Join the station data table with the facts table by eva which we fetch from the station table name.
     sql = text("""
         SELECT AVG(arrival_delay_minutes + departure_delay_minutes) as avg_delay
         FROM fact_train_stops fts

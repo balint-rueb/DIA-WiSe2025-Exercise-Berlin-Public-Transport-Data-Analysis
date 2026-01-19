@@ -1,3 +1,5 @@
 alembic
 sqlalchemy
 psycopg2-binary
+lxml
+rapidfuzz

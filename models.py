@@ -18,12 +18,12 @@ class TrainProfile(Base):
 
     profile_id = Column(Integer, primary_key=True, autoincrement=True)
     train_number = Column(String(50))
-    train_line = Column(String(50))
+
     train_type = Column(String(50))
 
     __table_args__ = (
         #re-name constraint using alembic migration
-        UniqueConstraint('train_number', 'train_line', 'train_type', name='_train_profile_uc'),
+        UniqueConstraint('train_number', 'train_type', name='_train_profile_uc'),
     )
 
 class Time(Base):
@@ -38,12 +38,13 @@ class Time(Base):
 class TrainStop(Base):
     __tablename__ = "fact_train_stops"
 
-    stop_id = Column(Integer, primary_key=True, autoincrement=True)
+    stop_id = Column(String, primary_key=True)
     
     station_eva = Column(BigInteger, ForeignKey("dim_stations.station_eva"))
     profile_id = Column(Integer, ForeignKey("dim_train_profiles.profile_id"))
     date_id = Column(Date, ForeignKey("dim_time.date_id"))
 
+    train_line = Column(String(50))
     planned_arrival = Column(TIMESTAMP)
     actual_arrival = Column(TIMESTAMP)
     planned_departure = Column(TIMESTAMP)

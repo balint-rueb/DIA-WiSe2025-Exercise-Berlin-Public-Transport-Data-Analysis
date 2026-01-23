@@ -111,7 +111,7 @@ if __name__ == "__main__":
             task_2_2_find_closest_station(session, 52.5163, 13.3777)
 
             # Task 2.3 Example: Check cancellations on a specific date/hour found in your dataset
-            # (Adjust the date below to match your XML data range!)
+    
             task_2_3_count_cancellations(session, date(2025, 9, 2), 16)
 
             # Task 2.4 Example: Average delay for Berlin Hbf

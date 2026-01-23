@@ -27,7 +27,7 @@ def process_station_data(station_data: json, db_session: Session):
     :param db_session: Description
     :type db_session: DB Session
     """
-    
+
     stations_list = station_data.get("result", [])
 
     print(f"Found {len(stations_list)} stations in the data.")

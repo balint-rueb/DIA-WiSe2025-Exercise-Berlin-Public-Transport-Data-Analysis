@@ -1,6 +1,7 @@
 name: DIA_2025_26 #included to prevent name collision on volumes and networks across multiple projects
 services:
   app:
+    container_name: task_1_etl_pipeline,
     build:
       context: ..
       dockerfile: Dockerfile
@@ -11,6 +12,8 @@ services:
     depends_on:
       - db:
           condition: service_healthy
+    stdin_open: true # Docker starts containers in a non-interactive mode by default, bin/bash is interactive. This tells Docker to keep the STDIN open for the container.
+    tty: true        # where the container sends the output from its processes. This allocates a pseudo-TTY, which is necessary for interactive sessions like bash.
 
   db:
     image: postgres:latest

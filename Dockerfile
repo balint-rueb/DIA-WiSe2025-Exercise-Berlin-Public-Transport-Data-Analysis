@@ -25,4 +25,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 #Here we copy the code into the image, wheres in the development stage we just mount it
 COPY . .
 
-CMD ["python", "etl_pipeline.py"]
+# run all DB migrations and the start ETL pipeline
+CMD sh -c "alembic upgrade head && /bin/bash"

@@ -53,7 +53,6 @@ def load_station_cache(session):
 
     stations = session.query(Station).all()
     
-    # Normalized map: { "berlinalexanderplatz": 8010004 }
     cache = {utils.default_process(s.station_name): s.station_eva for s in stations}
     #manually add problematic stations that dont match well
     cache[utils.default_process('yorckstra_e__gro_g_rschenstra_e_')] = 8089051

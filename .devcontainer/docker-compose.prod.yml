@@ -1,0 +1,28 @@
+name: DIA_2025_26 #included to prevent name collision on volumes and networks across multiple projects
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: production
+    env_file:
+      - ../env/postgres.env
+      - ../env/pgadmin.env
+    depends_on:
+      - db:
+          condition: service_healthy
+
+  db:
+    image: postgres:latest
+    env_file:
+      - ../env/postgres.env
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data #dedicated prod volume to avoid conflicts with devcontainer volume, easier debugging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

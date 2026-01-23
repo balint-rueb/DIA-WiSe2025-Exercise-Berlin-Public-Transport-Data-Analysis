@@ -2,9 +2,8 @@ import json
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import insert
-from models import Station, TrainProfile, Time, TrainStop
+from models import Station,Time
 import os, time
-from datetime import datetime
 
 #import xml parsing library
 from lxml import etree
@@ -28,15 +27,16 @@ def process_station_data(station_data: json, db_session: Session):
     :param db_session: Description
     :type db_session: DB Session
     """
+    
     stations_list = station_data.get("result", [])
 
     print(f"Found {len(stations_list)} stations in the data.")
     count_inserted = 0
     for station in stations_list:
-        station_name = station["name"] # I want the extraction to fail if name is missing
+        station_name = station["name"]
 
         #find main eva number and coords
-        eva_list = station["evaNumbers"] # I want the extraction to fail if evaNumbers is missing
+        eva_list = station["evaNumbers"] 
         for eva in eva_list:
             if eva["isMain"] == True:
                 station_eva = eva["number"]

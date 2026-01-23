@@ -2,7 +2,7 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/anaconda
 {
 	"name": "DIA with Postgres DB",
-	"dockerComposeFile" : ["docker-compose.yml", "docker-compose.debug.yml"],
+	"dockerComposeFile" : ["docker-compose.yml"],
 	"service" : "devcontainer", // Name of the service in docker-compose.yml to use as the dev container
 	"workspaceFolder": "/app", //synced with WORKDIR of Dockerfile
 	"shutdownAction": "stopCompose", // Stop the docker-compose service when the dev container is closed

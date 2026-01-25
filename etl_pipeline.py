@@ -4,12 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.dialects.postgresql import insert
 from models import Station,Time
 
-
-#import xml parsing library
-from lxml import etree
-
 #import utility functions
-from utils import load_station_cache, get_dates_from_filename, generate_date_range, stream_xml_files, get_eva_with_fuzzy_match, normalize_station_names
+from utils import load_station_cache, get_dates_from_filename, generate_date_range, normalize_station_names
 
 #import misc libraries
 import json
@@ -111,29 +107,13 @@ def populate_time_dimension(session, dir):
 
     print(f"Successfully processed {len(date_entries)} days into dim_time.")
 
-def run_timetable_pipeline_parallel(dir_path):
+def run_timetable_pipeline_parallel(dir_path,station_cache):
     """
     Creates tasks for each .tar.gz file in the specified directory and processes them with timetable function.
     :param dir_path: Directory containing .tar.gz timetable files
     :type dir_path: str
     """
     db_url = os.getenv("DB")
-    
-    # Create resources used by all workers
-    # station data, station cache, time dimension
-    print("Setting up shared resources for workers...")
-    engine = create_engine(db_url)
-    with Session(engine) as session:
-        # Load Station Data & Cache FIRST so all workers have it
-        print("Loading Station Data...")
-        with open('station_data.json', 'r') as f:
-            station_data = json.load(f)
-        
-        process_station_data(station_data, session) 
-        
-        station_cache = load_station_cache(session)
-        
-        populate_time_dimension(session, dir_path)
 
     # Prepare list of .tar.gz files to process
     tar_files = [f for f in os.listdir(dir_path) if f.endswith(".tar.gz")]
@@ -178,5 +158,16 @@ def run_timetable_changes_pipeline_parallel(dir_path):
 if __name__ == "__main__":
     TIMETABLES_DIR = "./timetables"
     CHANGES_DIR = "./timetable_changes"
-    run_timetable_pipeline_parallel(TIMETABLES_DIR)
+    with Session(create_engine(os.getenv("DB"))) as session:
+        dir_path = TIMETABLES_DIR
+        with open('station_data.json', 'r') as f:
+            station_data = json.load(f)
+        
+            process_station_data(station_data, session) 
+        
+            station_cache = load_station_cache(session)
+        
+            populate_time_dimension(session, dir_path)
+
+    run_timetable_pipeline_parallel(TIMETABLES_DIR, station_cache)
     run_timetable_changes_pipeline_parallel(CHANGES_DIR)

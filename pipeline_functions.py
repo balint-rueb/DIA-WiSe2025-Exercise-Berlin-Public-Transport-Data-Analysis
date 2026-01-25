@@ -40,20 +40,22 @@ def process_timetable_archive(args):
     try:
         # Stream and process XML files from the archive
         with tarfile.open(full_path, "r:gz") as tarball:
-            for file in tarball:
+            for member in tarball:
+                if not(member.isfile() and member.name.endswith(".xml")):
+                    continue
                 
                 file_count += 1
                 
                 # file names are as follows:
                 # YYMMDD_HHMM/stationname_timetable.xml
-                file_path_parts = file.name.split('/')
+                file_path_parts = member.name.split('/')
                 
                 time_info = file_path_parts[0]
                 file_station_name = file_path_parts[1][:-14] # Removing "_timetable.xml"
                 date_obj = datetime.strptime(time_info[:6], '%y%m%d').date()
 
                 # parse and stream XML
-                f = tarball.extractfile(file)
+                f = tarball.extractfile(member)
                 context = etree.iterparse(f, events=('start', 'end'))
                 current_station_eva = None
 
@@ -204,10 +206,13 @@ def process_timetable_changes_archive(args):
 
     try:
         with tarfile.open(full_path, "r:gz") as tarball:
-            for file in tarball:
+            for member in tarball:
+                if not(member.isfile() and member.name.endswith(".xml")):
+                    #skip all non .xml files
+                    continue
                 
                 file_count += 1
-                f = tarball.extractfile(file)
+                f = tarball.extractfile(member)
                 
                 # Parse only 's' tags (stops)
                 context = etree.iterparse(f, events=('end',))
@@ -221,10 +226,12 @@ def process_timetable_changes_archive(args):
                             dp = elem.find('dp')
 
                             def parse_ct(tag):
+                                if tag is None: return None
                                 ct = tag.get('ct') # "YYMMDDHHMM"
                                 return datetime.strptime(ct, "%y%m%d%H%M") if ct else None
                             
                             def check_cancel(tag):
+                                if tag is None: return False
                                 return tag.get('cs') == 'c'
 
                             # extract new arr and dep times
@@ -258,7 +265,7 @@ def process_timetable_changes_archive(args):
                                 del elem.getparent()[0]
                                 
                 except Exception as e:
-                    print(f"XML Error in {file.name}: {e}")
+                    print(f"XML Error in {member.name}: {e}")
                 finally:
                     f.close()
                     del context

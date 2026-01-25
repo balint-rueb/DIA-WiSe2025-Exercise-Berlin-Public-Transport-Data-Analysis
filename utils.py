@@ -71,7 +71,6 @@ def get_eva_with_fuzzy_match(name, cache):
     if norm_name in cache:
         eva = cache[norm_name]
         memoized_matches[name] = eva 
-        print(f"Direct matched '{name}' -> '{norm_name}'")
         return eva
     
     # 3. Fuzzy Match (Slow - only runs ONCE per unique station name per file)
@@ -90,7 +89,7 @@ def get_eva_with_fuzzy_match(name, cache):
 def normalize_station_names(name: str) -> str:
     """Normalizes station names for better matching."""
     # strips whitespace and removes 'berlin' from names, I dont handle special german characters and rely on fuzzy matching instead
-    return utils.default_process(name).replace('berlin', '')
+    return utils.default_process(name).replace('berlin', '').strip()
 
 
 def get_or_create_profile_safe(session, t_type, t_num):

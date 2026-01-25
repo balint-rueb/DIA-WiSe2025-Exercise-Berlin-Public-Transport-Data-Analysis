@@ -1,4 +1,5 @@
-name: DIA_2025_26 #included to prevent name collision on volumes and networks across multiple projects
+name: DIA_2025_26_B_Z #included to prevent name collision on volumes and networks across multiple projects
+version: "3.9"
 services:
   app:
     container_name: dia_eval
@@ -28,4 +29,4 @@ services:
       retries: 5
 
 volumes:
-  pgdata:
+  pgdata_prod:

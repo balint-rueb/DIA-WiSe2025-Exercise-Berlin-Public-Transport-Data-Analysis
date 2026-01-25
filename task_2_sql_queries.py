@@ -75,7 +75,7 @@ def task_2_3_count_cancellations(session):
         formatted_date = f"2025-{month}-{day}" 
         
     except ValueError:
-        print("❌ Invalid format! Please use MM_DD_HH (e.g., 09_24_16).")
+        print("Invalid format! Please use MM_DD_HH (e.g., 09_24_16).")
         return
     
     print(f"\n--- Task 2.3: Cancellations on {formatted_date} at {hour}:00 ---")
@@ -84,7 +84,11 @@ def task_2_3_count_cancellations(session):
         SELECT COUNT(*) 
         FROM fact_train_stops
         WHERE date_id = :date
-        AND EXTRACT(HOUR FROM planned_arrival) = :hour
+        AND (
+            EXTRACT(HOUR FROM planned_arrival) = :hour 
+            OR 
+            EXTRACT(HOUR FROM planned_departure) = :hour
+        )
         AND is_cancelled = TRUE
     """)
     

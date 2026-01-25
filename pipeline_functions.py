@@ -1,9 +1,11 @@
-import json
+# db related imports
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, text
-from sqlalchemy.dialects.postgresql import insert
+
+#misc imports
 import os
 from datetime import datetime
+import tarfile
 
 #import xml parsing library
 from lxml import etree
@@ -11,21 +13,18 @@ from lxml import etree
 #import utility functions
 from utils import get_eva_with_fuzzy_match,get_or_create_profile_safe, perform_bulk_insert
 
-
-
-
-import tarfile
-# --- WORKER FUNCTION for timetables ---
 def process_timetable_archive(args):
     """
-    Worker function to process a single tar.gz archive.
+    Worker function to process a single tar.gz archive of timetable data.
     Args:
         args: tuple containing (filename, dir_path, station_cache_dump, db_url)
     """
+
     filename, dir_path, station_cache, db_url = args
     
-    # 1. Setup Independent DB Connection for this Process
-    # SQLAlchemy engines/sessions cannot be shared across processes
+    # Setup Independent DB Connection for this Process
+    # SQLAlchemy engines/sessions cannot be shared across processes but can be created independently per process
+    # The db handles connection pooling internally
     engine = create_engine(db_url)
     session = Session(engine)
     
@@ -40,32 +39,32 @@ def process_timetable_archive(args):
 
     try:
         # Stream and process XML files from the archive
-        with tarfile.open(full_path, "r:gz") as tar:
-            for member in tar:
-                if not(member.isfile() and member.name.endswith(".xml")):
-                    continue
+        with tarfile.open(full_path, "r:gz") as tarball:
+            for file in tarball:
                 
                 file_count += 1
                 
-                # Extract Metadata
-                path_parts = member.name.split('/')
+                # file names are as follows:
+                # YYMMDD_HHMM/stationname_timetable.xml
+                file_path_parts = file.name.split('/')
                 
-                hourly_folder = path_parts[0]
-                xml_full_name = path_parts[1]
-                file_station_name = xml_full_name[:-14] # Removing "_timetable.xml"
-                date_obj = datetime.strptime(hourly_folder[:6], '%y%m%d').date()
+                time_info = file_path_parts[0]
+                file_station_name = file_path_parts[1][:-14] # Removing "_timetable.xml"
+                date_obj = datetime.strptime(time_info[:6], '%y%m%d').date()
 
-                # Stream Parse XML
-                f = tar.extractfile(member)
+                # parse and stream XML
+                f = tarball.extractfile(file)
                 context = etree.iterparse(f, events=('start', 'end'))
                 current_station_eva = None
 
                 try:
+                    # iterate over all elements in the xml
                     for event, elem in context:
+                        # if we are at the start of an element and its a timetable, get station name, and eva
                         if event == 'start' and elem.tag == 'timetable':
                             xml_station_name = elem.get('station')
                             
-                            # RESOLVE STATION EVA
+                            # In case the XML does not provide a station name, we fallback to the file name
                             if xml_station_name:
                                 current_station_eva = get_eva_with_fuzzy_match(xml_station_name, station_cache)
                             if current_station_eva is None and file_station_name:
@@ -74,28 +73,30 @@ def process_timetable_archive(args):
                             if current_station_eva is None:
                                 break # Skip this file if no station found
 
+                        # if we are at the end of a stop element, parse and store
                         elif event == 'end' and elem.tag == 's':
                             tl = elem.find('tl')
                             ar = elem.find('ar')
                             dp = elem.find('dp')
-                            
-                            if tl is None: continue
 
-                            # --- GET OR CREATE PROFILE (Concurrency Safe) ---
+                            # get or create the train profile id
                             t_type = tl.get('c')
                             t_num = tl.get('n')
                             profile_key = (t_type, t_num)
 
+                            # fetch the train profile from cache or get it from db and place it in cache
                             if profile_key in local_profile_cache:
                                 profile_id = local_profile_cache[profile_key]
                             else:
                                 profile_id = get_or_create_profile_safe(session, t_type, t_num)
                                 local_profile_cache[profile_key] = profile_id
 
-                            # --- PARSE STOP DATA ---
+                            # get train line, sometimes ar is missing, sometimes dp is missing
                             line = (ar.get('l') if ar is not None else None) or \
                                    (dp.get('l') if dp is not None else None)
 
+
+                            # helper to get the planned time from ar and dp tags
                             def parse_pt(tag):
                                 if tag is None: return None
                                 pt = tag.get('pt')
@@ -111,12 +112,12 @@ def process_timetable_archive(args):
                                 "planned_departure": parse_pt(dp)
                             })
 
-                            # --- BATCH INSERT ---
+                            # batch insert for faster performance
                             if len(batch) >= batch_size:
                                 perform_bulk_insert(session, batch)
                                 batch = []
 
-                            # Memory Cleanup
+                            # we need to remove the processed xml tag from memory as lxml otherwise keeps the entire xml in mem
                             elem.clear()
                             while elem.getprevious() is not None:
                                 del elem.getparent()[0]
@@ -135,20 +136,22 @@ def process_timetable_archive(args):
     except Exception as e:
         print(f"Failed to process archive {filename}: {e}")
     finally:
+        # Close session and dispose engine
         session.close()
         engine.dispose()
     
     return f"Done: {filename} ({file_count} files)"
 
 
-# --- WORKER FUNCTION for timetable changes---
 def process_timetable_changes_archive(args):
     """
-    Worker to process a single timetable_changes tar.gz file.
+    Worker function to process a single tar.gz archive of timetable_changes data.
+    Args:
+        args: tuple containing (filename, dir_path, station_cache_dump, db_url)
     """
     filename, dir_path, db_url = args
     
-    # 1. Setup DB Connection
+    # Setup DB Connection
     engine = create_engine(db_url)
     session = Session(engine)
     
@@ -157,33 +160,40 @@ def process_timetable_changes_archive(args):
     file_count = 0
     full_path = os.path.join(dir_path, filename)
 
-    # 2. DEFINE RAW SQL STATEMENT
-    # We use :colon_names as placeholders. 
-    # These match the keys in our batch dictionary below.
-    # We cast the delay calculation to INTEGER to match your table schema.
+    # now we need to update already exisiting records based on stop_id
+    # to do this we use a raw sql update with placeholders.
+    # we then pass this sql with a batch of data to the DB and it bulk inserts it
+    # much less network overhead and faster than individual updates
     
     raw_sql = text("""
         UPDATE fact_train_stops
         SET 
             -- Update Actual Times (Use existing if new value is NULL)
+            -- COALESCE selects the first non-null value from the list
             actual_arrival = COALESCE(:b_act_arr, actual_arrival),
             actual_departure = COALESCE(:b_act_dep, actual_departure),
             
+            -- We need to calculate how many minutes late the train is.
             -- Calculate Arrival Delay: (New Actual - Planned) / 60
             arrival_delay_minutes = CASE 
+                -- Only do calculation if we have a new actual arrival time
                 WHEN :b_act_arr IS NOT NULL 
-                THEN CAST(EXTRACT(EPOCH FROM (:b_act_arr - planned_arrival)) / 60 AS INTEGER)
+                THEN CAST(EXTRACT(EPOCH FROM (:b_act_arr - planned_arrival)) -- Subtract timestamps to get difference, convert to total seconds (EPOCH)
+                    / 60                                                     -- Convert seconds to minutes
+                   AS INTEGER                                                -- Cast to INTEGER for storage
+                )
+                -- If we dont have a new actual arrival time, change nothing (will be null)
                 ELSE arrival_delay_minutes 
             END,
             
-            -- Calculate Departure Delay
+            -- Calculate Departure Delay, same as above
             departure_delay_minutes = CASE 
                 WHEN :b_act_dep IS NOT NULL 
                 THEN CAST(EXTRACT(EPOCH FROM (:b_act_dep - planned_departure)) / 60 AS INTEGER)
                 ELSE departure_delay_minutes 
             END,
             
-            -- Handle Cancellations (Only update if True, never un-cancel)
+            -- Handle Cancellations (Only update if True, never un-cancel, we assume train stays cancelled)
             is_cancelled = CASE 
                 WHEN :b_cancelled = true THEN true
                 ELSE is_cancelled 
@@ -193,13 +203,11 @@ def process_timetable_changes_archive(args):
     """)
 
     try:
-        with tarfile.open(full_path, "r:gz") as tar:
-            for member in tar:
-                if not(member.isfile() and member.name.endswith(".xml")):
-                    continue
+        with tarfile.open(full_path, "r:gz") as tarball:
+            for file in tarball:
                 
                 file_count += 1
-                f = tar.extractfile(member)
+                f = tarball.extractfile(file)
                 
                 # Parse only 's' tags (stops)
                 context = etree.iterparse(f, events=('end',))
@@ -208,30 +216,25 @@ def process_timetable_changes_archive(args):
                     for event, elem in context:
                         if elem.tag == 's':
                             stop_id = elem.get('id')
-                            if not stop_id: 
-                                continue
 
                             ar = elem.find('ar')
                             dp = elem.find('dp')
 
-                            # --- Helper Functions ---
                             def parse_ct(tag):
-                                if tag is None: return None
                                 ct = tag.get('ct') # "YYMMDDHHMM"
                                 return datetime.strptime(ct, "%y%m%d%H%M") if ct else None
                             
                             def check_cancel(tag):
-                                if tag is None: return False
                                 return tag.get('cs') == 'c'
 
-                            # --- Extract Data ---
+                            # extract new arr and dep times
                             new_arr = parse_ct(ar)
                             new_dep = parse_ct(dp)
                             
                             # A train is cancelled if EITHER arrival or dep is flagged 'c'
                             is_cancelled = check_cancel(ar) or check_cancel(dp)
 
-                            # --- Add to Batch ---
+                            # add data to batch
                             # Only add if we have useful data
                             if new_arr or new_dep or is_cancelled:
                                 batch.append({
@@ -243,24 +246,24 @@ def process_timetable_changes_archive(args):
                                     "b_cancelled": True if is_cancelled else None
                                 })
 
-                            # --- Execute Batch ---
+                            # send batch to db
                             if len(batch) >= batch_size:
                                 session.execute(raw_sql, batch)
                                 session.commit()
                                 batch = []
                             
-                            # Cleanup Memory
+                            # clean up memory like before
                             elem.clear()
                             while elem.getprevious() is not None:
                                 del elem.getparent()[0]
                                 
                 except Exception as e:
-                    print(f"XML Error in {member.name}: {e}")
+                    print(f"XML Error in {file.name}: {e}")
                 finally:
                     f.close()
                     del context
 
-        # Process remaining records
+        # process rest of batch
         if batch:
             session.execute(raw_sql, batch)
             session.commit()

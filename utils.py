@@ -17,7 +17,7 @@ import re
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
 
-#memoization dictionary for fuzzy matching
+#memoization dictionary for faster fuzzy matching
 memoized_matches = {}
 
 def get_dates_from_filename(filename: str):
@@ -54,28 +54,27 @@ def load_station_cache(session):
     stations = session.query(Station).all()
     
     cache = {utils.default_process(s.station_name): s.station_eva for s in stations}
-    #manually add problematic stations that dont match well
+    #manually add problematic station
     cache[utils.default_process('yorckstra_e__gro_g_rschenstra_e_')] = 8089051
     return cache
 
 def get_eva_with_fuzzy_match(name, cache):
-    if not name: return None
 
-    # 1. CHECK MEMOIZATION FIRST (Instant)
+    # 1. CHECK MEMOIZATION FIRST
     # If we've already figured out this messy name before, return it immediately.
     if name in memoized_matches:
         return memoized_matches[name]
 
     norm_name = normalize_station_names(name)
     
-    # 2. Direct Hit (Fast)
+    # 2. Direct Hit in station name cache
     if norm_name in cache:
         eva = cache[norm_name]
         memoized_matches[name] = eva 
         print(f"Direct matched '{name}' -> '{norm_name}'")
         return eva
     
-    # 3. Fuzzy Match (Slow - only runs ONCE per unique station name)
+    # 3. Fuzzy Match (Slow - only runs ONCE per unique station name per file)
     match = process.extractOne(norm_name, cache.keys())
     if match:
         eva = cache[match[0]]
@@ -83,11 +82,14 @@ def get_eva_with_fuzzy_match(name, cache):
         memoized_matches[name] = eva # Remember this result!
         return eva
     
+    # this should techinically never happen since we have a fuzzy match with no max score
+    print(f"WARNING: No match found for station name '{name}'")
     return None
 
 
 def normalize_station_names(name: str) -> str:
     """Normalizes station names for better matching."""
+    # strips whitespace and removes 'berlin' from names, I dont handle special german characters and rely on fuzzy matching instead
     return utils.default_process(name).replace('berlin', '')
 
 
@@ -98,7 +100,7 @@ def get_or_create_profile_safe(session, t_type, t_num):
     2. If missing, insert (ignoring conflicts). 
     3. Select again.
     """
-    # 1. Try to find existing
+    # 1. Try to find existing profile
     stmt = select(TrainProfile.profile_id).filter_by(train_type=t_type, train_number=t_num)
     result = session.execute(stmt).scalar()
     

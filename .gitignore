@@ -4,3 +4,4 @@ migrations/__pycache__/
 *.py[cod]
 timetables/*
 timetable_changes/*
+*.parquet

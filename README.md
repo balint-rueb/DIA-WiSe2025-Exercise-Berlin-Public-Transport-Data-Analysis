@@ -17,5 +17,7 @@ For task 2
 python task_2_sql_queries.py
 
 For task 3
+python task_3_1.py
+python 3_2.py
 
 

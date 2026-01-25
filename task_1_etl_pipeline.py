@@ -128,7 +128,7 @@ def run_timetable_pipeline_parallel(dir_path,station_cache):
 
     start_time = time.time()
     
-    with Pool(processes=cpu_count()) as pool:
+    with Pool(processes=len(tar_files) if cpu_count()>= len(tar_files) else cpu_count()) as pool:
         pool.map(process_timetable_archive, tasks)
 
     total_time = time.time() - start_time
@@ -149,7 +149,7 @@ def run_timetable_changes_pipeline_parallel(dir_path):
     
     start = time.time()
     
-    with Pool(processes=cpu_count()) as pool:
+    with Pool(processes=len(files) if cpu_count()>= len(files) else cpu_count()) as pool:
         pool.map(process_timetable_changes_archive, tasks)
         
     print(f"--- Changes ETL Finished in {time.time() - start:.2f}s ---")
@@ -169,5 +169,7 @@ if __name__ == "__main__":
         
             populate_time_dimension(session, dir_path)
 
+    start = time.time()
     run_timetable_pipeline_parallel(TIMETABLES_DIR, station_cache)
     run_timetable_changes_pipeline_parallel(CHANGES_DIR)
+    print(f"--- Total pipeline time: {time.time() - start:.2f}s ---")

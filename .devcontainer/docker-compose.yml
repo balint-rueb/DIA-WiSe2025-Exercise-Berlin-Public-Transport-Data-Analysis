@@ -1,6 +1,7 @@
 name: DIA_2025_26 #included to prevent name collision on volumes and networks across multiple projects
 services:
   devcontainer:
+    container_name: dia_dev
     build:
       context: ..
       dockerfile: Dockerfile

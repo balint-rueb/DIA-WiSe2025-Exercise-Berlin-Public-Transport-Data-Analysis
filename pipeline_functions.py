@@ -42,6 +42,7 @@ def process_timetable_archive(args):
         with tarfile.open(full_path, "r:gz") as tarball:
             for member in tarball:
                 if not(member.isfile() and member.name.endswith(".xml")):
+                    print(f"Processing files in: {member.name} in archive {filename}")
                     continue
                 
                 file_count += 1
@@ -208,10 +209,12 @@ def process_timetable_changes_archive(args):
         with tarfile.open(full_path, "r:gz") as tarball:
             for member in tarball:
                 if not(member.isfile() and member.name.endswith(".xml")):
+                    print(f"Processing files in: {member.name} in archive {filename}")
                     #skip all non .xml files
                     continue
                 
                 file_count += 1
+
                 f = tarball.extractfile(member)
                 
                 # Parse only 's' tags (stops)

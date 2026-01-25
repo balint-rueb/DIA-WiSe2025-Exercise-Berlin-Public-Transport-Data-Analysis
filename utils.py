@@ -77,7 +77,6 @@ def get_eva_with_fuzzy_match(name, cache):
     match = process.extractOne(norm_name, cache.keys())
     if match:
         eva = cache[match[0]]
-        print(f"Fuzzy matched '{name}' -> '{match[0]}' (Score: {match[1]})")
         memoized_matches[name] = eva # Remember this result!
         return eva
     

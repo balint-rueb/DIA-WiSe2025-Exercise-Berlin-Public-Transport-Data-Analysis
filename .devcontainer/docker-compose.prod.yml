@@ -1,7 +1,7 @@
 name: DIA_2025_26 #included to prevent name collision on volumes and networks across multiple projects
 services:
   app:
-    container_name: task_1_etl_pipeline,
+    container_name: dia_eval
     build:
       context: ..
       dockerfile: Dockerfile

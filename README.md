@@ -4,12 +4,11 @@ Open the project in VSCode and >Devcontainer: Open Folder in Container or someth
 Run alembic upgrade head in terminal
 
 # For evaluation
-Start the containers with the following command and attach to the main container with a terminal:
+1. Pull code from here. The project contains the train data, meaning it is completely self contained. Navigate to the root folder of the project.
+2. Start the containers with the following command:
+    docker compose -f .devcontainer/docker-compose.prod.yml up -d && docker attach dia_eval
 
-docker compose -f .devcontainer/docker-compose.prod.yml up -d && docker attach dia_eval
-
-Once the terminal is ready, run
-
+3. Once the terminal is ready, run
 For task 1
 python task_1_etl_pipeline.py 
 
@@ -18,6 +17,7 @@ python task_2_sql_queries.py
 
 For task 3
 python task_3_1.py
-python 3_2.py
+python tasl_3_2.py
+
 
 

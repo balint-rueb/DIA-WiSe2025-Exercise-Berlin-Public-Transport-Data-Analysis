@@ -1,5 +1,4 @@
 name: DIA_2025_26_B_Z #included to prevent name collision on volumes and networks across multiple projects
-version: "3.9"
 services:
   app:
     container_name: dia_eval
@@ -11,7 +10,7 @@ services:
       - ../env/postgres.env
       - ../env/pgadmin.env
     depends_on:
-      - db:
+        db:
           condition: service_healthy
     stdin_open: true # Docker starts containers in a non-interactive mode by default, bin/bash is interactive. This tells Docker to keep the STDIN open for the container.
     tty: true        # where the container sends the output from its processes. This allocates a pseudo-TTY, which is necessary for interactive sessions like bash.

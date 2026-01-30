@@ -1,93 +1,63 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
 import pyspark.sql.functions as F
+# had to add these because I kept getting 'undefined' errors
+from pyspark.sql.functions import col, array, concat
 
-# Initialize spark session for the graph task
-spark = SparkSession.builder \
-    .appName('Graph Routing') \
-    .getOrCreate()
+spark = SparkSession.builder.appName('Task_4_1_Graph').getOrCreate()
 
-raw_df = spark.read.parquet('./timetables.parquet')
-# Split by '-' and take everything EXCEPT the last element
-df = raw_df.withColumn("trip_id", F.regexp_replace(F.col("sid"), "-[0-9]+$", ""))
+# 1. Cleaning the data and fixing the ID
+# The sid in the file has a stop index at the end (like -05). 
+# We use a regex to chop that off so all stops for one train have the same trip_id.
+raw_data = spark.read.parquet('./timetables.parquet')
+df = raw_data.withColumn("trip_id", F.regexp_replace(F.col("sid"), "-[0-9]+$", "")) \
+             .withColumn("st_norm", F.upper(F.trim(F.col("station"))))
 
-# Cleaning station names just to be safe
-df = df.withColumn("st_norm", F.upper(F.trim(F.col("station"))))
+# 2. Building the "Roadmap" (Edges)
+# We use a window to look at each trip and see which station follows another.
+win = Window.partitionBy("trip_id").orderBy("planned_time")
 
-# We partition by our 'trip_id' which stays the same for the whole journey
-graph_win = Window.partitionBy("trip_id").orderBy("planned_time")
+# lag() lets us link the current station to the one before it.
+# the window makes sure we only look within the same trip_id and in time order.
+# We filter out Nulls (the first station has no previous) and select src/dst pairs.
+# then we remove any duplicate edges.
+# in the end we have a list of all direct connections between stations.
+edges = df.withColumn("prev", F.lag("st_norm").over(win)) \
+          .filter(F.col("prev").isNotNull()) \
+          .select(F.col("prev").alias("src"), F.col("st_norm").alias("dst")) \
+          .distinct()
 
-# Create edges by using lag to find previous station in the trip
-raw_edges = df.withColumn("prev_st", F.lag("st_norm").over(graph_win)) \
-    .filter(F.col("prev_st").isNotNull()) \
-    .select(F.col("prev_st").alias("src"), F.col("st_norm").alias("dst")) \
-    .distinct()
+# We union the edges with their reverse to make the graph undirected
+full_graph = edges.union(edges.select(col("dst"), col("src"))).distinct().cache()
 
-# The graph must be undirected since we care about transfers, not just one-way trips
-# So we flip the edges and union them back together
-flipped = raw_edges.select(F.col("dst").alias("src"), F.col("src").alias("dst"))
-full_edges = raw_edges.union(flipped).distinct().cache()
-
-print(f"Graph initialization complete. Unique edges: {full_edges.count()}")
-
-def find_shortest_path(start, end, max_depth=12):
-    # Start and end nodes need to be exactly as they appear in the DF
-    print(f"Starting BFS search from {start} to {end}")
+# 3. Finding the path using BFS
+def find_path(start_st, end_st,hops=15):
+    start, end = start_st.upper(), end_st.upper()
     
-    # Initial state: just the starting station with itself as the path
-    # Using a list for path tracking
-    frontier = spark.createDataFrame([(start, [start])], ["node", "path"])
+    # We start with a dataframe containing just the start station
+    paths = spark.createDataFrame([(start, [start])], ["node", "path"])
+    visited = {start} # set to keep track of where we've been
     
-    # We keep track of visited to avoid infinite loops between stations
-    visited = {start}
-    
-    for i in range(1, max_depth + 1):
-        # Step 1: Find all neighbors of the current frontier
-        # We join our current nodes with the source of our edges
-        next_step = frontier.join(full_edges, frontier.node == full_edges.src) \
-            .select(
-                F.col("dst").alias("node"),
-                F.concat(F.col("path"), F.array(F.col("dst"))).alias("path")
-            )
+    for hop in range(1, hops+1):
+        # Join current stations with the edge list to find the next set of neighbors
+        next_hop = paths.join(full_graph, paths.node == full_graph.src) \
+                        .select(F.col("dst").alias("node"), 
+                                concat(F.col("path"), array(F.col("dst"))).alias("path"))
         
-        # Step 2: Filter out anything we've already seen to keep the DF small
-        # This is a bit slow because we convert the set to a list for Spark
-        next_step = next_step.filter(~F.col("node").isin(list(visited)))
+        # Don't go back to stations we already visited
+        next_hop = next_hop.filter(~F.col("node").isin(list(visited)))
         
-        # Check if we have anything left to explore
-        count = next_step.count()
-        print(f"Iteration {i}: found {count} potential next stations")
+        # Check if we hit the target
+        reached = next_hop.filter(F.col("node") == end).limit(1).collect()
+        if reached:
+            print(f"Found path in {hop} hops: {' -> '.join(reached[0]['path'])}")
+            return
         
-        if count == 0:
-            print("Search stopped: no more reachable nodes found.")
-            break
-            
-        # Step 3: See if our target is in this new batch
-        # We limit(1) because we only need the first shortest path we find
-        match = next_step.filter(F.col("node") == end).limit(1).collect()
+        # Update our visited list and continue
+        new_nodes = next_hop.select("node").distinct().collect()
+        if not new_nodes: break
+        for n in new_nodes: visited.add(n['node'])
         
-        if len(match) > 0:
-            res_path = match[0]['path']
-            print(f"Path found in {i} hops!")
-            print(" -> ".join(res_path))
-            return res_path
+        paths = next_hop.cache() # Cache to keep things fast
 
-        # Step 4: Prepare for next iteration
-        # We collect the new nodes to update the visited set in local python
-        new_nodes = next_step.select("node").distinct().collect()
-        for r in new_nodes:
-            visited.add(r['node'])
-            
-        # Cache the frontier to stop the lineage from getting too long
-        frontier = next_step.cache()
-
-    print("Failed to find path within max depth.")
-    return None
-
-# Verify the names one last time before running
-full_edges.filter(F.col("src").like("%BERLIN%")).select("src").distinct().show(10)
-
-# Run search
-target_start = "BERLIN WESTEND"
-target_end = "BERLIN RATHAUS STEGLITZ"
-find_shortest_path(target_start, target_end)
+find_path("BERLIN WESTEND", "BERLIN RATHAUS STEGLITZ")

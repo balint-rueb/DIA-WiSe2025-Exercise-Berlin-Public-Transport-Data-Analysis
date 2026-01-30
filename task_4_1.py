@@ -4,7 +4,7 @@ import pyspark.sql.functions as F
 
 # Initialize spark session for the graph task
 spark = SparkSession.builder \
-    .appName('TrainGraphRouting') \
+    .appName('Graph Routing') \
     .getOrCreate()
 
 raw_df = spark.read.parquet('./timetables.parquet')

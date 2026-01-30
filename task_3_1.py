@@ -10,7 +10,7 @@ from pyspark.sql.functions import to_date, col
 
 def setup_spark():
     return SparkSession.builder \
-        .appName("Task 3.1: Train Data ETL") \
+        .appName("Spark Task 3.1") \
         .config("spark.driver.memory", "4g") \
         .getOrCreate()
 

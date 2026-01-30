@@ -4,7 +4,9 @@ Open the project in VSCode and >Devcontainer: Open Folder in Container or someth
 Run alembic upgrade head in terminal
 
 # For evaluation
-ENSURE TIMETABLES AND TIMETABLE_CHANGES FOLDERS ARE LOCATED IN THE ROOT FOLDER OF THIS PROJECT. OTHERWISE IT WONT WORK!
+ENSURE TIMETABLES AND TIMETABLE_CHANGES FOLDERS ARE LOCATED IN THE ROOT OF THIS PROJECT. OTHERWISE IT WONT WORK!
+THE DATA INSIDE SHOULD REMAIN IN TAR.GZ. DO NOT EXTRACT!
+
 1.  Pull code from here. The project contains the train data, meaning it is completely self contained. 
 2. Start the containers with the following command:
     docker compose -f .devcontainer/docker-compose.prod.yml up -d --build && docker attach dia_eval
@@ -18,8 +20,8 @@ python task_2_sql_queries.py
 
 For task 3
 python task_3_1.py
-python tasl_3_2.py
-
+python task_3_2.py
+python task_3_3.py
 
 For task 4
 python task_4_1.py

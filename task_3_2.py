@@ -15,7 +15,7 @@ timetable_changes_path = './timetable_changes.parquet'
 changes = spark.read.parquet(timetable_changes_path)
 #########################################################
  ## get the planned time and canclled time of the station 
-station = "Berlin Anhalter Bf"
+station = "Berlin Alexanderplatz"
 
 # join two data sets and filter them
 joined_data = timetables.join(changes, on=['sid', 'station', 'event_type', 'date'], how='inner')

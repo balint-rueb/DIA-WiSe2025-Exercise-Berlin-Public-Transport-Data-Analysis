@@ -6,3 +6,6 @@ __pycache__
 .env
 .vscode
 .devcontainer
+
+# Ignore local processed data
+*.parquet/

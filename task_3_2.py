@@ -18,12 +18,13 @@ changes = spark.read.parquet(timetable_changes_path)
 station = "Berlin Anhalter Bf"
 
 # join two data sets and filter them
-joined_data = timetables.join(changes, on = ['sid', 'station', 'event_type'], how= 'inner')
+joined_data = timetables.join(changes, on=['sid', 'station', 'event_type', 'date'], how='inner')
 
-station_data = joined_data.filter(col('station')== station)
 
-filtered_data = station_data.filter(
-    (col('planned_time').isNotNull()) & col('cancellation_time').isNotNull())
+filtered_data = joined_data.filter(
+    (col('station') == station) & 
+    (col('cancellation_status') != 'c')
+)
 
 #######################################
 # step 1: calculate delay by using above filtered data

@@ -4,6 +4,7 @@ Open the project in VSCode and >Devcontainer: Open Folder in Container or someth
 Run alembic upgrade head in terminal
 
 # For evaluation
+ENSURE TIMETABLES AND TIMETABLE_CHANGES FOLDERS ARE LOCATED IN THE ROOT FOLDER OF THIS PROJECT. OTHERWISE IT WONT WORK!
 1.  Pull code from here. The project contains the train data, meaning it is completely self contained. 
 2. Start the containers with the following command:
     docker compose -f .devcontainer/docker-compose.prod.yml up -d --build && docker attach dia_eval
